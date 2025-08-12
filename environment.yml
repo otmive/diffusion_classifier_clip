@@ -1,0 +1,11 @@
+name: base
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - conda
+  - setuptools
+  - pip
+  - wheel
+  - conda-content-trust
+prefix: /user/work/ep16475/miniconda3
