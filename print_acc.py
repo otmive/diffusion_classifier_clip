@@ -24,26 +24,26 @@ train_classes = [
 ]
 
 def get_rel_prompt_folder(data_type):
-    type_dict = {'idval':'train_rel_prompts',
-                 'idtest':'train_rel_prompts',
-                 'val':'beth_rel_prompts_val',
-                 'test':'test_rel_prompts',
-                 'idval_gen':'train_rel_prompts_gen',
-                 'idtest_gen': 'train_rel_prompts_gen',
-                 'val_gen': 'beth_rel_prompts_val_gen',
-                 'test_gen': 'test_rel_prompts_gen'}
+    type_dict = {'idval':'rel_train',
+                 'idtest':'rel_train',
+                 'val':'rel_val',
+                 'test':'rel_test',
+                 'idval_gen':'rel_train_gen',
+                 'idtest_gen': 'rel_train_gen',
+                 'val_gen': 'rel_val_gen',
+                 'test_gen': 'rel_test_gen'}
     
     return type_dict[data_type]
 
 def get_prompt_folder(data_type):
-    type_dict = {'idval':'train_two_obj_prompts',
-                 'idtest':'train_two_obj_prompts',
-                 'val':'beth_two_obj_prompts',
-                 'test':'test_two_obj_prompts',
-                 'idval_gen':'train_two_obj_prompts_gen',
-                 'idtest_gen': 'train_two_obj_prompts_gen',
-                 'val_gen': 'gen_two_obj_prompts',
-                 'test_gen': 'test_two_obj_prompts_gen'}
+    type_dict = {'idval':'two_obj_train',
+                 'idtest':'two_obj_train',
+                 'val':'two_obj_val',
+                 'test':'two_obj_test',
+                 'idval_gen':'two_obj_train_gen',
+                 'idtest_gen': 'two_obj_train_gen',
+                 'val_gen': 'two_obj_val_gen',
+                 'test_gen': 'two_obj_test_gen'}
     
     return type_dict[data_type]
 
@@ -255,14 +255,14 @@ def print_acc_rel(output_folder, errors, data_type):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output_file', required=True, help='Path to output file of CLIP results')
+    parser.add_argument('--output_file', required=True, help='Path to output file of results')
     parser.add_argument('--dataset', default='single' )
     parser.add_argument('--errors', default=False, type=bool)
     parser.add_argument('--datatype', default=None)
     args = parser.parse_args()
     if args.dataset == 'single':
         print_acc(args.output_file, args.errors)
-    elif args.dataset == 'two':
+    elif args.dataset == 'two_object':
         print_acc_two(args.output_file, args.errors, args.datatype)
-    elif args.dataset == 'rel':
+    elif args.dataset == 'relational':
         print_acc_rel(args.output_file, args.errors, args.datatype)

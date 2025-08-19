@@ -101,8 +101,6 @@ def eval_prob_adaptive(unet, latent, text_embeds, scheduler, args, latent_size=6
         # compute the next remaining idxs
  
         errors = [-data[prompt_i]['pred_errors'].mean() for prompt_i in remaining_prmpt_idxs]  
-        print("length errors ", len(errors))
-        print("to keep ", n_to_keep)
         best_idxs = torch.topk(torch.tensor(errors), k=n_to_keep, dim=0).indices.tolist()
         remaining_prmpt_idxs = [remaining_prmpt_idxs[i] for i in best_idxs]
 
@@ -205,11 +203,8 @@ def main():
     interpolation = INTERPOLATIONS[args.interpolation]
     transform = get_transform(interpolation, args.img_size)
     latent_size = args.img_size // 8
-    print("dataset path: ", args.dataset_path)
-    target_dataset = get_target_dataset(args.dataset, train=args.split == 'train', transform=transform, dataset_path=args.dataset_path, data_split=args.data_split)
-    prompts_df = pd.read_csv(args.prompt_path)
 
-    # load pretrained models
+        # load pretrained models
     vae, tokenizer, text_encoder, unet, scheduler = get_sd_model(args)
     vae = vae.to(device)
     text_encoder = text_encoder.to(device)
@@ -224,70 +219,157 @@ def main():
     else:
         all_noise = None
 
-    # refer to https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion.py#L276
-    text_input = tokenizer(prompts_df.prompt.tolist(), padding="max_length",
-                           max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")
-    embeddings = []
-    with torch.inference_mode():
-        for i in range(0, len(text_input.input_ids), 100):
-            text_embeddings = text_encoder(
-                text_input.input_ids[i: i + 100].to(device),
-            )[0]
-            embeddings.append(text_embeddings)
-    text_embeddings = torch.cat(embeddings, dim=0)
-    assert len(text_embeddings) == len(prompts_df)
+    if args.data_type == "single":
+        print("dataset path: ", args.dataset_path)
+        target_dataset = get_target_dataset(args.dataset, train=args.split == 'train', transform=transform, dataset_path=args.dataset_path, data_split=args.data_split, data_type=args.data_type, prompt_path=args.prompt_path)
+        prompts_df = pd.read_csv(args.prompt_path)
 
-    # subset of dataset to evaluate
-    if args.subset_path is not None:
-        idxs = np.load(args.subset_path).tolist()
-    else:
-        idxs = list(range(len(target_dataset)))
-    idxs_to_eval = idxs[args.worker_idx::args.n_workers]
 
-    formatstr = get_formatstr(len(target_dataset) - 1)
-    correct = 0
-    total = 0
-    pbar = tqdm.tqdm(idxs_to_eval)
-    rows_list = []
-    for i in pbar:
-        if total > 0:
-            pbar.set_description(f'Acc: {100 * correct / total:.2f}%')
-        fname = osp.join(run_folder, formatstr.format(i) + '.pt')
-        if os.path.exists(fname):
-            print('Skipping', i)
-            if args.load_stats:
-                data = torch.load(fname)
-                correct += int(data['pred'] == data['label'])
+
+        # refer to https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion.py#L276
+        text_input = tokenizer(prompts_df.prompt.tolist(), padding="max_length",
+                            max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")
+        embeddings = []
+        with torch.inference_mode():
+            for i in range(0, len(text_input.input_ids), 100):
+                text_embeddings = text_encoder(
+                    text_input.input_ids[i: i + 100].to(device),
+                )[0]
+                embeddings.append(text_embeddings)
+        text_embeddings = torch.cat(embeddings, dim=0)
+        assert len(text_embeddings) == len(prompts_df)
+
+        # subset of dataset to evaluate
+        if args.subset_path is not None:
+            idxs = np.load(args.subset_path).tolist()
+        else:
+            idxs = list(range(len(target_dataset)))
+        idxs_to_eval = idxs[args.worker_idx::args.n_workers]
+
+        formatstr = get_formatstr(len(target_dataset) - 1)
+        correct = 0
+        total = 0
+        pbar = tqdm.tqdm(idxs_to_eval)
+        rows_list = []
+        for i in pbar:
+            if total > 0:
+                pbar.set_description(f'Acc: {100 * correct / total:.2f}%')
+            fname = osp.join(run_folder, formatstr.format(i) + '.pt')
+            if os.path.exists(fname):
+                print('Skipping', i)
+                if args.load_stats:
+                    data = torch.load(fname)
+                    correct += int(data['pred'] == data['label'])
+                    total += 1
+                continue
+            image, label = target_dataset[i]
+            label = target_dataset.file_to_class[str(i)]
+            with torch.no_grad():
+                img_input = image.to(device).unsqueeze(0)
+                if args.dtype == 'float16':
+                    img_input = img_input.half()
+                x0 = vae.encode(img_input).latent_dist.mean
+                x0 *= 0.18215
+            pred_idx, pred_errors = eval_prob_adaptive(unet, x0, text_embeddings, scheduler, args, latent_size, all_noise)
+            pred = prompts_df.classidx[pred_idx]
+            print("pred ",pred)
+            print("label ", label)
+
+            dict1 = {'true': label, 'pred': pred}
+            rows_list.append(dict1)
+            prediction = list(target_dataset.class_to_idx.keys())[list(target_dataset.class_to_idx.values()).index(pred)]
+            lbl = list(target_dataset.class_to_idx.keys())[list(target_dataset.class_to_idx.values()).index(label)]
+            print("prediction: ", prediction)
+            print("true_label: ", lbl)
+            if pred == label:
+                correct += 1
+            total += 1
+
+        df = pd.DataFrame(rows_list)
+        if args.data_type == 'single':
+            df.to_csv(args.output_file)
+        elif args.data_type == 'two_object':
+            df.to_csv(args.output_file +'/'+args.data_split+'.csv')
+
+    elif args.data_type == "two_object" or args.data_type == "relational":
+
+        print("TWOO")
+
+        data_splits = os.listdir(args.dataset_path)
+        for data_split in data_splits:
+            print(data_split)
+            prompt_path = args.prompt_path + "/" + data_split + ".csv"
+            target_dataset = get_target_dataset(args.dataset, train=args.split == 'train', transform=transform, dataset_path=args.dataset_path, data_split=data_split, data_type=args.data_type, prompt_path=prompt_path)
+            prompts_df = pd.read_csv(prompt_path)
+
+
+
+            # refer to https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion.py#L276
+            text_input = tokenizer(prompts_df.prompt.tolist(), padding="max_length",
+                                max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")
+            embeddings = []
+            with torch.inference_mode():
+                for i in range(0, len(text_input.input_ids), 100):
+                    text_embeddings = text_encoder(
+                        text_input.input_ids[i: i + 100].to(device),
+                    )[0]
+                    embeddings.append(text_embeddings)
+            text_embeddings = torch.cat(embeddings, dim=0)
+            assert len(text_embeddings) == len(prompts_df)
+
+            # subset of dataset to evaluate
+            if args.subset_path is not None:
+                idxs = np.load(args.subset_path).tolist()
+            else:
+                idxs = list(range(len(target_dataset)))
+            idxs_to_eval = idxs[args.worker_idx::args.n_workers]
+
+            formatstr = get_formatstr(len(target_dataset) - 1)
+            correct = 0
+            total = 0
+            pbar = tqdm.tqdm(idxs_to_eval)
+            rows_list = []
+            for i in pbar:
+                if total > 0:
+                    pbar.set_description(f'Acc: {100 * correct / total:.2f}%')
+                fname = osp.join(run_folder, formatstr.format(i) + '.pt')
+                if os.path.exists(fname):
+                    print('Skipping', i)
+                    if args.load_stats:
+                        data = torch.load(fname)
+                        correct += int(data['pred'] == data['label'])
+                        total += 1
+                    continue
+                image, label = target_dataset[i]
+                label = target_dataset.file_to_class[str(i)]
+                with torch.no_grad():
+                    img_input = image.to(device).unsqueeze(0)
+                    if args.dtype == 'float16':
+                        img_input = img_input.half()
+                    x0 = vae.encode(img_input).latent_dist.mean
+                    x0 *= 0.18215
+                pred_idx, pred_errors = eval_prob_adaptive(unet, x0, text_embeddings, scheduler, args, latent_size, all_noise)
+                pred = prompts_df.classidx[pred_idx]
+                print("pred ",pred)
+                print("label ", label)
+
+                dict1 = {'true': label, 'pred': pred}
+                rows_list.append(dict1)
+                prediction = list(target_dataset.class_to_idx.keys())[list(target_dataset.class_to_idx.values()).index(pred)]
+                lbl = list(target_dataset.class_to_idx.keys())[list(target_dataset.class_to_idx.values()).index(label)]
+                print("prediction: ", prediction)
+                print("true_label: ", lbl)
+                if pred == label:
+                    correct += 1
                 total += 1
-            continue
-        image, label = target_dataset[i]
-        label = target_dataset.file_to_class[str(i)]
-        with torch.no_grad():
-            img_input = image.to(device).unsqueeze(0)
-            if args.dtype == 'float16':
-                img_input = img_input.half()
-            x0 = vae.encode(img_input).latent_dist.mean
-            x0 *= 0.18215
-        pred_idx, pred_errors = eval_prob_adaptive(unet, x0, text_embeddings, scheduler, args, latent_size, all_noise)
-        pred = prompts_df.classidx[pred_idx]
-        print("pred ",pred)
-        print("label ", label)
 
-        dict1 = {'true': label, 'pred': pred}
-        rows_list.append(dict1)
-        prediction = list(target_dataset.class_to_idx.keys())[list(target_dataset.class_to_idx.values()).index(pred)]
-        lbl = list(target_dataset.class_to_idx.keys())[list(target_dataset.class_to_idx.values()).index(label)]
-        print("prediction: ", prediction)
-        print("true_label: ", lbl)
-        if pred == label:
-            correct += 1
-        total += 1
+            df = pd.DataFrame(rows_list)
 
-    df = pd.DataFrame(rows_list)
-    if args.data_type == 'single':
-        df.to_csv(args.output_file)
-    elif args.data_type == 'two':
-        df.to_csv(args.output_file +'/'+args.data_split+'.csv')
+            if not os.path.exists(args.output_file):
+                os.mkdir(args.output_file)
+            df.to_csv(args.output_file +'/' + data_split+'.csv')
+
+
 
 
 

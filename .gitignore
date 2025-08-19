@@ -1,5 +1,7 @@
 *.out
 *.sh
 cobi2_datasets/
-cobi2_datasets.zip
+*.zip
 models/
+*.pt
+*.ipynb

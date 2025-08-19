@@ -23,7 +23,7 @@ def predict(img_path, output_file, model_path):
         class_names.append(folder)
     print(class_names)
 
-    classes = pd.read_csv("prompts/clevr_prompts_cone.csv")['class_name'].tolist()
+    classes = pd.read_csv("cobi2_datasets/single_object/single_prompts.csv")['class_name'].tolist()
     #candidate_names = ["blue cone", "blue cylinder", "brown cylinder", "cyan cube", "gray cone", "green cone", "green cube", "purple cube", "red cone", "red cube", "yellow cylinder"]
     candidate_captions = [f"a photo of a {cls}" for cls in classes]
     print(candidate_captions)
@@ -188,14 +188,14 @@ def predict_rel(img_path, output_file, model_path, prompt_path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--image_folder', required=True, help='Path to folder of images to evalutate')
-    parser.add_argument('--dataset', required=True, help='Single, Two or Rel')
+    parser.add_argument('--dataset', required=True, help='Single, Two_object or Relational')
     parser.add_argument('--output_file', required=True, help='Name of output csv file')
     parser.add_argument('--model_path', default=None, help='Path to fine-tuned CLIP model weights') 
     parser.add_argument('--prompt_path', default=None, help='Required for two object and relational')
     args = parser.parse_args()
     if args.dataset.lower() == 'single':
         predict(img_path=args.image_folder, output_file=args.output_file, model_path=args.model_path)
-    elif args.dataset.lower() == 'two':
+    elif args.dataset.lower() == 'two_object':
         predict_two(img_path=args.image_folder, output_file=args.output_file, model_path=args.model_path, prompt_path=args.prompt_path)
-    elif args.dataset.lower()=='rel':
+    elif args.dataset.lower()=='relational':
         predict_rel(img_path=args.image_folder, output_file=args.output_file, model_path=args.model_path, prompt_path=args.prompt_path)

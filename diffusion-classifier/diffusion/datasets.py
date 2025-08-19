@@ -13,7 +13,7 @@ class MNIST(datasets.MNIST):
     class_to_idx = {str(i): i for i in range(10)}
 
 
-def get_target_dataset(name: str, train=False, transform=None, target_transform=None, dataset_path=None, data_split=None):
+def get_target_dataset(name: str, train=False, transform=None, target_transform=None, dataset_path=None, data_split=None, data_type="single", prompt_path=None):
     """Get the torchvision dataset that we want to use.
     If the dataset doesn't have a class_to_idx attribute, we add it.
     Also add a file-to-class map for evaluation
@@ -97,40 +97,45 @@ def get_target_dataset(name: str, train=False, transform=None, target_transform=
         dataset = MNIST(root=DATASET_ROOT, train=train, transform=transform, target_transform=target_transform,
                         download=True)
     elif name == "clevr":
-        dataset = datasets.ImageFolder(dataset_path, transform=transform)
-        classes = pd.read_csv('../../cobi2_datasets/single_object/single_prompts.csv')
-        dataset.class_to_idx = {classes.iloc[i, 1] : classes.iloc[i,2] for i in range(len(classes))}
-        # dataset.file_to_class = {}
-        # count = 0
-        # for name in sorted(glob.glob('/content/drive/MyDrive/single_object/images/*png')):
-        #     cur_name = os.path.basename(name)
-        #     for i in range(len(dfs)):
-        #       filename = dfs.iloc[i,1]
-        #       if filename == cur_name:
-        #         dataset.file_to_class[str(count)] = dataset.class_to_idx[dfs.iloc[i,2]]
-        #         count += 1
+        
+        if data_type == "single":
+            dataset = datasets.ImageFolder(dataset_path, transform=transform)
+            classes = pd.read_csv(prompt_path)
+            dataset.class_to_idx = {classes.iloc[i, 1] : classes.iloc[i,2] for i in range(len(classes))}
+        elif data_type == "two_object" or data_type=="relational":
+            dataset = datasets.ImageFolder(dataset_path, transform=transform)
+            classes = pd.read_csv(prompt_path)
+            print("classes: ")
+            dataset.class_to_idx = {classes.iloc[i, 2] : classes.iloc[i,3] for i in range(len(classes))}
 
     else:
         raise ValueError(f"Dataset {name} not supported.")
 
     if name in {'mnist', 'cifar10', 'stl10', 'aircraft', 'clevr'}:
         
-        train_class_list = {0:1, 1:3, 2:4, 3:5, 4:10, 5:11, 6:13, 7:15, 8:18, 9:19, 10:20, 11:20, 12:23, 13:26, 14:27, 15:28, 16:31 }
-        test_class_list = {0:0, 1:2, 2:6, 3:9, 4:12, 5:16, 6:17, 7:21, 8:24, 9:25, 10:30}
-        val_class_list = {0:7, 1:8, 2:14, 3:29}
-        if data_split == 'train' or data_split == 'id_val' or data_split == 'id_test':
-            class_list = train_class_list
-        elif data_split == 'ood_val':
-            class_list = val_class_list
-        elif data_split == 'ood_test':
-            class_list = test_class_list
+        if data_type == "single":
+            train_class_list = {0:1, 1:3, 2:4, 3:5, 4:10, 5:11, 6:13, 7:15, 8:18, 9:19, 10:20, 11:20, 12:23, 13:26, 14:27, 15:28, 16:31 }
+            test_class_list = {0:0, 1:2, 2:6, 3:9, 4:12, 5:16, 6:17, 7:21, 8:24, 9:25, 10:30}
+            val_class_list = {0:7, 1:8, 2:14, 3:29}
+            if data_split == 'train' or data_split == 'id_val' or data_split == 'id_test':
+                class_list = train_class_list
+            elif data_split == 'ood_val':
+                class_list = val_class_list
+            elif data_split == 'ood_test':
+                class_list = test_class_list
 
-        dataset.file_to_class = {
-           str(idx): class_list[dataset[idx][1]]
-         for idx in range(len(dataset))
-       #     str(idx): dataset[idx][1]
-       #     for idx in range(len(dataset))
-        }
+            dataset.file_to_class = {
+            str(idx): class_list[dataset[idx][1]]
+            for idx in range(len(dataset))
+        #     str(idx): dataset[idx][1]
+        #     for idx in range(len(dataset))
+            }
+        elif data_type == "two_object" or data_type == "relational":
+            dataset.file_to_class = {
+            str(idx): 0
+           for idx in range(len(dataset))
+            }
+
 
 
     print("file to class ", dataset.file_to_class)

@@ -14,7 +14,7 @@ import argparse
 import sys
 
 BATCH_SIZE = 8
-EPOCH = 20
+EPOCH = 30
 
 
 def set_seed(seed):
@@ -154,7 +154,7 @@ def convert_models_to_fp32(model):
         p.data = p.data.float()
         p.grad.data = p.grad.data.float()
 
-def finetune(dataset, seed, data_path, batch_size=BATCH_SIZE, epoch=EPOCH):
+def finetune(dataset, seed, data_path, save_path, batch_size=BATCH_SIZE, epoch=EPOCH):
     set_seed(seed)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -233,13 +233,14 @@ def finetune(dataset, seed, data_path, batch_size=BATCH_SIZE, epoch=EPOCH):
 
 
     #wandb.finish()
-    torch.save(model.state_dict(), "single_clip_model.pt")
+    torch.save(model.state_dict(), save_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Fine-tune CLIP model on dataset')
     parser.add_argument('--dataset', type=str, default='single', help='type of data: single, two-object or relational')
     parser.add_argument('--data_path', type=str, required=True, help='Path to dataset')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
+    parser.add_argument('--save_path', type=str, help='Path to save the fine-tuned model, ending with .pt')
     args = parser.parse_args()
 
-    finetune(dataset=args.dataset, seed=args.seed, data_path=args.data_path)
+    finetune(dataset=args.dataset, seed=args.seed, data_path=args.data_path, save_path=args.save_path)
