@@ -14,7 +14,7 @@ pip install git+https://github.com/openai/CLIP.git
 ```
 
 ## Load dataset
-You can download the dataset from https://drive.google.com/file/d/14U4azHV6FHI8yeALWfgKvnH40OpDvbz1/view?usp=drive_link
+You can download the dataset from https://drive.google.com/file/d/14U4azHV6FHI8yeALWfgKvnH40OpDvbz1/view?usp=sharing
 
 ## Fine-tune CLIP
 ```
