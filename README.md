@@ -42,8 +42,8 @@ python train_dreambooth.py \
   --lr_warmup_steps=0 \
   --num_class_images=30 \
   --sample_batch_size=4 \
-  --max_train_steps=10 \
-  --save_interval=10 \
+  --max_train_steps=3000 \
+  --save_interval=3000 \
   --data_type=<single|two_object|relational> \
   --folder_path=<path_to_training_images> \
 ```
@@ -52,12 +52,17 @@ python train_dreambooth.py \
 ## Run models on data
 ### CLIP
 You can use for example the following command to run frozen CLIP on the ID val single data split
-```python clip_predict.py --image_folder 'cobi2_datasets/single_object/ID_val/' --output_file 'results/single/clip/clip_single_idval_s1.csv' --dataset single
+
+```
+python clip_predict.py --image_folder 'cobi2_datasets/single_object/ID_val/' --output_file 'results/single/clip/clip_single_idval_s1.csv' --dataset single
 ```
 
 You can use for example the following command to run the fine-tuned single model on the ID val single data split
-```python clip_predict.py --image_folder 'cobi2_datasets/single_object/ID_val/' --output_file 'results/single/clip/clip_single_idval_s1' --dataset single --model_path models/clip/single_object/seed_1_single.pt
+
 ```
+python clip_predict.py --image_folder 'cobi2_datasets/single_object/ID_val/' --output_file 'results/single/clip/clip_single_idval_s1' --dataset single --model_path models/clip/single_object/seed_1_single.pt
+```
+
 For two object and relational the prompt path must be specified:
 ```
 python clip_predict.py --image_folder 'cobi2_datasets/two_object/ood_val/' --output_file 'clip_two_oodval_frz' --dataset two_object --prompt_path "cobi2_datasets/two_object/two_object_prompts/two_obj_val"
@@ -108,4 +113,15 @@ python print_acc.py --output_file "results/single/clip/clip_single_idval_s1.csv"
 For two object and relational the dataset split must be specified: idval, idtest, val, test, idval_gen, idtest_gen, val_gen or test_gen.
 ```
 python print_acc.py --output_file "two_object_ood_val" --dataset "two_object" --datatype "val"
+```
+
+### Plotting t-SNE of CLIP embeddings
+```
+python tsne_plots.py --model_path "relational_finetuned_clip.pt"
+```
+
+### Generating fine-tuned Stable Diffusion images
+```
+
+python generate_sd_images.py --model_path "single_finetuned_dc/10" --prompt "a photo of a blue sphere"
 ```
