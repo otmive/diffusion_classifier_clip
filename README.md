@@ -6,7 +6,7 @@ This work uses the Diffusion-Classifier model proposed in [Your Diffusion Model 
 
 Create environment
 ```
-conda env create -f enrironment.yml
+conda env create -f envrironment.yml
 ```
 Install clip
 ```
